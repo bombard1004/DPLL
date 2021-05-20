@@ -1,5 +1,8 @@
 import sys
 
+# clause = (vars, assignedvars, neg, conflict)
+# cluases = (unit, incomplete, complete, conflict)
+
 def parse(filename):
     with open(filename, 'r') as f:
         while True:
@@ -17,10 +20,34 @@ def parse(filename):
     
     return nbvar, nbclauses, clauses
 
+def DPLL(nbvar, nbclauses, clauses):
+    A = list()
+
+    while True:
+
+        while True:
+            unit = getUnit(clauses)
+            if unit is None: break
+            assignUnit(unit, A)
+        
+        if isEmpty(clauses):
+            return A
+        
+        if hasConflict(clauses):
+            C = learningClause()
+            if(isEmpty(C)):
+                return None
+            
+            backtrack(A, C)
+            continue
+        
+        assignNew(A)
+        
+
 def main(filename):
     nbvar, nbclauses, clauses = parse(filename)
-    for clause in clauses:
-        print(clause)
+    res = DPLL(nbvar, nbclauses, clauses)
+    makeOutput(res)
 
 if __name__ == '__main__':
     main(sys.argv[1])
