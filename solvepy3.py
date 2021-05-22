@@ -121,8 +121,9 @@ def assignUnit(unit: Clause, A: List[Assignment], formula: Formula) -> None:
         c.assign(varLoc, val)
     for c in formula.completes:
         c.assign(varLoc, val)
-    
+
     formula.rearrange()
+    formula.addClause(unit)
 
     A.append(Assignment(varLoc, val, unit))
 
