@@ -32,21 +32,11 @@ class Clause():
     def empty(self) -> bool:
         return self.variableBits == 0
     
-    def assign(self, varLoc: int, val: bool) -> None:
-        if self.contains(varLoc):
-            self.remainingBits ^= varLoc
-            if bool(varLoc & self.positivenessBits) == val:
-                self.satisfiedBits |= varLoc
-    
-    def cancel(self, varLoc: int) -> None:
-        self.remainingBits ^= (varLoc & self.variableBits)
-        self.satisfiedBits &= (~varLoc)
-    
-    def assignMulti(self, varLocs: int, vals: int) -> None:
+    def assign(self, varLocs: int, vals: int) -> None:
         self.satisfiedBits |= ((self.remainingBits & varLocs) & (~(self.positivenessBits ^ vals)))
         self.remainingBits &= (~varLocs)
     
-    def cancelMulti(self, varLocs: int) -> None:
+    def cancel(self, varLocs: int) -> None:
         self.satisfiedBits &= (~varLocs)
         self.remainingBits |= (varLocs & self.variableBits)
 
@@ -88,31 +78,23 @@ class Formula():
     def hasConflict(self) -> bool:
         return len(self.conflicts) > 0
     
-    def assignAll(self, varLoc: int, val: bool) -> None:
+    def assignAll(self, varLocs: int, vals: int) -> None:
         for c in self.units:
-            c.assign(varLoc, val)
+            c.assign(varLocs, vals)
         for c in self.incompletes:
-            c.assign(varLoc, val)
-
-        self.rearrange(afterAssign=True)
-    
-    def assignAllMulti(self, varLocs: int, vals: int) -> None:
-        for c in self.units:
-            c.assignMulti(varLocs, vals)
-        for c in self.incompletes:
-            c.assignMulti(varLocs, vals)
+            c.assign(varLocs, vals)
         
         self.rearrange(afterAssign=True)
     
-    def cancelAllMulti(self, varLocs: int) -> None:
+    def cancelAll(self, varLocs: int) -> None:
         for c in self.units:
-            c.cancelMulti(varLocs)
+            c.cancel(varLocs)
         for c in self.incompletes:
-            c.cancelMulti(varLocs)
+            c.cancel(varLocs)
         for c in self.completes:
-            c.cancelMulti(varLocs)
+            c.cancel(varLocs)
         for c in self.conflicts:
-            c.cancelMulti(varLocs)
+            c.cancel(varLocs)
         
         self.rearrange(afterAssign=False)
           
@@ -170,13 +152,13 @@ def parse(filename: str) -> Tuple[int, int, Formula]:
     return nbvar, nbclauses, formula
 
 def assignNew(A: List[Assignment], formula: Formula, nbvar: int) -> None:
-    bits = (1 << nbvar) - 1
+    freeBits = (1 << nbvar) - 1
     for asm in A:
-        bits ^= asm.varLoc
+        freeBits ^= asm.varLoc
     
-    varLoc = (bits & -bits)
+    varLoc = (freeBits & -freeBits)
 
-    formula.assignAll(varLoc, True)
+    formula.assignAll(varLoc, varLoc)
     A.append(Assignment(varLoc, True, None))
 
 def learningClause(A: List[Assignment], conf: Clause) -> Clause:
@@ -201,7 +183,7 @@ def backtrack(A: List[Assignment], C: Clause, formula: Formula) -> None:
 
         varLocs |= asm.varLoc
     
-    formula.cancelAllMulti(varLocs)
+    formula.cancelAll(varLocs)
     formula.addClause(C)
 
 def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignment]]:
@@ -209,11 +191,10 @@ def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignme
     while True:
 
         while formula.hasUnit():
-            units = formula.units[:]
             varLocs = 0
             vals = 0
 
-            for unit in units:
+            for unit in formula.units:
                 varLoc = unit.remainingBits
                 val = varLoc & unit.positivenessBits
                 if (varLocs & varLoc) == 0:
@@ -221,7 +202,7 @@ def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignme
                     vals |= val
                     A.append(Assignment(varLoc, bool(val), unit))
             
-            formula.assignAllMulti(varLocs, vals)
+            formula.assignAll(varLocs, vals)
         
         if formula.noClauses():
             return A
