@@ -82,17 +82,44 @@ class Formula():
     
     def hasConflict(self) -> bool:
         return len(self.conflicts) > 0
-    
-    def rearrange(self) -> None:
-        clauses = self.units + self.incompletes + self.completes + self.conflicts
-
-        self.units.clear()
-        self.incompletes.clear()
-        self.completes.clear()
-        self.conflicts.clear()
-
-        for c in clauses:
-            self.addClause(c)
+          
+    def rearrange(self, afterAssign: bool) -> None:
+        if afterAssign:
+            # units -> units, completes, conflicts
+            # incompletes -> units, incompletes, completes
+            # completes -> completes (no need to rearrange)
+            # conflicts -> conflicts (no need to rearrange)
+            # order: units => incompletes
+            prevUnits = self.units[:]
+            self.units.clear()
+            for c in prevUnits:
+                self.addClause(c)
+            
+            prevIncompletes = self.incompletes[:]
+            self.incompletes.clear()
+            for c in prevIncompletes:
+                self.addClause(c)
+        
+        else:
+            # units -> units, incompletes
+            # incompletes -> incompletes (no need to rearrange)
+            # completes -> units, incompletes, completes
+            # conflicts -> units, incompletes, conflicts
+            # order: units => completes => conflicts (units => conflicts => completes also OK)
+            prevUnits = self.units[:]
+            self.units.clear()
+            for c in prevUnits:
+                self.addClause(c)
+            
+            prevCompletes = self.completes[:]
+            self.completes.clear()
+            for c in prevCompletes:
+                self.addClause(c)
+            
+            prevConflicts = self.conflicts[:]
+            self.conflicts.clear()
+            for c in prevConflicts:
+                self.addClause(c)
 
 def parse(filename: str) -> Tuple[int, int, Formula]:
     with open(filename, 'r') as f:
@@ -122,7 +149,7 @@ def assignUnit(unit: Clause, A: List[Assignment], formula: Formula) -> None:
     for c in formula.completes:
         c.assign(varLoc, val)
 
-    formula.rearrange()
+    formula.rearrange(afterAssign=True)
     formula.addClause(unit)
 
     A.append(Assignment(varLoc, val, unit))
@@ -156,7 +183,7 @@ def backtrack(A: List[Assignment], C: Clause, formula: Formula) -> None:
         if C.remainingBits:
             break
     
-    formula.rearrange()
+    formula.rearrange(afterAssign=False)
     formula.addClause(C)
 
 def assignNew(A: List[Assignment], formula: Formula, nbvar: int) -> None:
@@ -173,7 +200,7 @@ def assignNew(A: List[Assignment], formula: Formula, nbvar: int) -> None:
     for c in formula.completes:
         c.assign(varLoc, True)
     
-    formula.rearrange()
+    formula.rearrange(afterAssign=True)
 
     A.append(Assignment(varLoc, True, None))
 
