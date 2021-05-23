@@ -42,6 +42,10 @@ class Clause():
         if self.contains(varLoc):
             self.remainingBits ^= varLoc
             self.satisfiedBits &= (~varLoc)
+    
+    def assignMulti(self, varLocs: int, vals: int) -> None:
+        self.satisfiedBits |= ((self.remainingBits & varLocs) & (~(self.positivenessBits ^ vals)))
+        self.remainingBits &= (~varLocs)
 
 class Assignment():
     '''
@@ -71,11 +75,9 @@ class Formula():
             self.units.append(clause)
         else:
             self.incompletes.append(clause)
-
-    def getUnit(self) -> Optional[Clause]:
-        if len(self.units) == 0:
-            return None
-        return self.units[0]
+    
+    def hasUnit(self) -> bool:
+        return len(self.units) > 0
     
     def noClauses(self) -> bool:
         return len(self.units) == 0 and len(self.incompletes) == 0 and len(self.conflicts) == 0
@@ -91,6 +93,16 @@ class Formula():
         for c in self.completes:
             c.assign(varLoc, val)
 
+        self.rearrange(afterAssign=True)
+    
+    def assignAllMulti(self, varLocs: int, vals: int) -> None:
+        for c in self.units:
+            c.assignMulti(varLocs, vals)
+        for c in self.incompletes:
+            c.assignMulti(varLocs, vals)
+        for c in self.completes:
+            c.assignMulti(varLocs, vals)
+        
         self.rearrange(afterAssign=True)
           
     def rearrange(self, afterAssign: bool) -> None:
@@ -146,13 +158,6 @@ def parse(filename: str) -> Tuple[int, int, Formula]:
     
     return nbvar, nbclauses, formula
 
-def assignUnit(unit: Clause, A: List[Assignment], formula: Formula) -> None:
-    varLoc = unit.remainingBits
-    val = bool(varLoc & unit.positivenessBits)
-
-    formula.assignAll(varLoc, val)
-    A.append(Assignment(varLoc, val, unit))
-
 def assignNew(A: List[Assignment], formula: Formula, nbvar: int) -> None:
     bits = (1 << nbvar) - 1
     for asm in A:
@@ -199,11 +204,20 @@ def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignme
     A: List[Assignment] = []
     while True:
 
-        while True:
-            unit = formula.getUnit()
-            if unit is None:
-                break
-            assignUnit(unit, A, formula)
+        while formula.hasUnit():
+            units = formula.units[:]
+            varLocs = 0
+            vals = 0
+
+            for unit in units:
+                varLoc = unit.remainingBits
+                val = varLoc & unit.positivenessBits
+                if (varLocs & varLoc) == 0:
+                    varLocs |= varLoc
+                    vals |= val
+                    A.append(Assignment(varLoc, bool(val), unit))
+            
+            formula.assignAllMulti(varLocs, vals)
         
         if formula.noClauses():
             return A
