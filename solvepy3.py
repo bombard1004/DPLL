@@ -93,8 +93,6 @@ class Formula():
             c.assign(varLoc, val)
         for c in self.incompletes:
             c.assign(varLoc, val)
-        for c in self.completes:
-            c.assign(varLoc, val)
 
         self.rearrange(afterAssign=True)
     
@@ -102,8 +100,6 @@ class Formula():
         for c in self.units:
             c.assignMulti(varLocs, vals)
         for c in self.incompletes:
-            c.assignMulti(varLocs, vals)
-        for c in self.completes:
             c.assignMulti(varLocs, vals)
         
         self.rearrange(afterAssign=True)
