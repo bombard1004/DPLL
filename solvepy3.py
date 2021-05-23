@@ -38,14 +38,17 @@ class Clause():
             if bool(varLoc & self.positivenessBits) == val:
                 self.satisfiedBits |= varLoc
     
-    def cancel(self, varLoc: int, val: bool) -> None:
-        if self.contains(varLoc):
-            self.remainingBits ^= varLoc
-            self.satisfiedBits &= (~varLoc)
+    def cancel(self, varLoc: int) -> None:
+        self.remainingBits ^= (varLoc & self.variableBits)
+        self.satisfiedBits &= (~varLoc)
     
     def assignMulti(self, varLocs: int, vals: int) -> None:
         self.satisfiedBits |= ((self.remainingBits & varLocs) & (~(self.positivenessBits ^ vals)))
         self.remainingBits &= (~varLocs)
+    
+    def cancelMulti(self, varLocs: int) -> None:
+        self.satisfiedBits &= (~varLocs)
+        self.remainingBits |= (varLocs & self.variableBits)
 
 class Assignment():
     '''
@@ -104,6 +107,18 @@ class Formula():
             c.assignMulti(varLocs, vals)
         
         self.rearrange(afterAssign=True)
+    
+    def cancelAllMulti(self, varLocs: int) -> None:
+        for c in self.units:
+            c.cancelMulti(varLocs)
+        for c in self.incompletes:
+            c.cancelMulti(varLocs)
+        for c in self.completes:
+            c.cancelMulti(varLocs)
+        for c in self.conflicts:
+            c.cancelMulti(varLocs)
+        
+        self.rearrange(afterAssign=False)
           
     def rearrange(self, afterAssign: bool) -> None:
         if afterAssign:
@@ -182,22 +197,15 @@ def learningClause(A: List[Assignment], conf: Clause) -> Clause:
     return D
 
 def backtrack(A: List[Assignment], C: Clause, formula: Formula) -> None:
-    while True:
-        asm = A.pop()
-        for c in formula.units:
-            c.cancel(asm.varLoc, asm.val)
-        for c in formula.incompletes:
-            c.cancel(asm.varLoc, asm.val)
-        for c in formula.completes:
-            c.cancel(asm.varLoc, asm.val)
-        for c in formula.conflicts:
-            c.cancel(asm.varLoc, asm.val)
-        C.cancel(asm.varLoc, asm.val)
-
-        if C.remainingBits:
-            break
+    varLocs = 0
     
-    formula.rearrange(afterAssign=False)
+    while C.remainingBits == 0:
+        asm = A.pop()
+        C.cancel(asm.varLoc)
+
+        varLocs |= asm.varLoc
+    
+    formula.cancelAllMulti(varLocs)
     formula.addClause(C)
 
 def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignment]]:
