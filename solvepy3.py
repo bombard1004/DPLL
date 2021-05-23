@@ -75,13 +75,23 @@ class Formula():
     def getUnit(self) -> Optional[Clause]:
         if len(self.units) == 0:
             return None
-        return self.units.pop()
+        return self.units[0]
     
     def noClauses(self) -> bool:
         return len(self.units) == 0 and len(self.incompletes) == 0 and len(self.conflicts) == 0
     
     def hasConflict(self) -> bool:
         return len(self.conflicts) > 0
+    
+    def assignAll(self, varLoc: int, val: bool) -> None:
+        for c in self.units:
+            c.assign(varLoc, val)
+        for c in self.incompletes:
+            c.assign(varLoc, val)
+        for c in self.completes:
+            c.assign(varLoc, val)
+
+        self.rearrange(afterAssign=True)
           
     def rearrange(self, afterAssign: bool) -> None:
         if afterAssign:
@@ -139,20 +149,19 @@ def parse(filename: str) -> Tuple[int, int, Formula]:
 def assignUnit(unit: Clause, A: List[Assignment], formula: Formula) -> None:
     varLoc = unit.remainingBits
     val = bool(varLoc & unit.positivenessBits)
-    unit.remainingBits = 0
-    unit.satisfiedBits = varLoc
 
-    for c in formula.units:
-        c.assign(varLoc, val)
-    for c in formula.incompletes:
-        c.assign(varLoc, val)
-    for c in formula.completes:
-        c.assign(varLoc, val)
-
-    formula.rearrange(afterAssign=True)
-    formula.addClause(unit)
-
+    formula.assignAll(varLoc, val)
     A.append(Assignment(varLoc, val, unit))
+
+def assignNew(A: List[Assignment], formula: Formula, nbvar: int) -> None:
+    bits = (1 << nbvar) - 1
+    for asm in A:
+        bits ^= asm.varLoc
+    
+    varLoc = (bits & -bits)
+
+    formula.assignAll(varLoc, True)
+    A.append(Assignment(varLoc, True, None))
 
 def learningClause(A: List[Assignment], conf: Clause) -> Clause:
     D = deepcopy(conf)
@@ -186,24 +195,6 @@ def backtrack(A: List[Assignment], C: Clause, formula: Formula) -> None:
     formula.rearrange(afterAssign=False)
     formula.addClause(C)
 
-def assignNew(A: List[Assignment], formula: Formula, nbvar: int) -> None:
-    bits = (1 << nbvar) - 1
-    for asm in A:
-        bits ^= asm.varLoc
-    
-    varLoc = (bits & -bits)
-
-    for c in formula.units:
-        c.assign(varLoc, True)
-    for c in formula.incompletes:
-        c.assign(varLoc, True)
-    for c in formula.completes:
-        c.assign(varLoc, True)
-    
-    formula.rearrange(afterAssign=True)
-
-    A.append(Assignment(varLoc, True, None))
-
 def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignment]]:
     A: List[Assignment] = []
     while True:
@@ -232,6 +223,11 @@ def main(filename: str) -> None:
     nbvar, nbclauses, formula = parse(filename)
     res = DPLL(nbvar, nbclauses, formula)
     print("UNSAT" if res == None else "SAT")
+
+def test(filename: str) -> bool:
+    nbvar, nbclauses, formula = parse(filename)
+    res = DPLL(nbvar, nbclauses, formula)
+    return res != None
 
 if __name__ == '__main__':
     main(sys.argv[1])
