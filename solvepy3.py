@@ -1,6 +1,7 @@
 import sys
 from typing import List, Optional, Tuple
 from copy import deepcopy
+from math import log2
 
 
 class Clause():
@@ -216,12 +217,22 @@ def DPLL(nbvar: int, nbclauses: int, formula: Formula) -> Optional[List[Assignme
             continue
         
         assignNew(A, formula, nbvar)
-        
+
+def makeOutput(res: Optional[List[Assignment]]) -> None:
+    if res == None:
+        print("s UNSATISFIABLE")
+    else:
+        print("s SATISFIABLE v", end=' ')
+        for asm in res:
+            var = int(log2(asm.varLoc)) + 1
+            val = asm.val
+            print(var if val else -var, end=' ')
+        print(0)
 
 def main(filename: str) -> None:
     nbvar, nbclauses, formula = parse(filename)
     res = DPLL(nbvar, nbclauses, formula)
-    print("UNSAT" if res == None else "SAT")
+    makeOutput(res)
 
 def test(filename: str) -> bool:
     nbvar, nbclauses, formula = parse(filename)
